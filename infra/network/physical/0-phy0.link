@@ -1,0 +1,5 @@
+[Match]
+Type=ether
+Kind=!*
+[Link]
+Name=phy0

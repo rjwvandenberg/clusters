@@ -1,0 +1,10 @@
+# match first ethernet, not being virtual
+[Match]
+Type=ether
+Kind=!*  
+[Network]
+MACVLAN=veth0
+LinkLocalAddressing=no
+[Link]
+ARP=no
+RequiredForOnline=no

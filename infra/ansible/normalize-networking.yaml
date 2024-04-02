@@ -1,0 +1,46 @@
+# assumption is that machine contains one physical ethernet port, if not need to something more generic
+
+# ubuntu 23.10 uses cloud-init to generate /etc/netplan/50-cloud-init.yaml
+# which is used by netplan to generate /run/systemd/network/10-netplan-eth0.network
+# https://ubuntu.com/blog/a-declarative-approach-to-linux-networking-with-netplan
+
+# netplan does not support macvlan, so remove it and let networkd manage its /etc/systemd/network/* files
+# https://bugs.launchpad.net/netplan/+bug/1664847
+
+- name: Remove cloud-init defaults
+  file:
+    path: /etc/netplan/50-cloud-init.yaml
+    state: absent
+
+- name: Remove netplan defaults
+  file:
+    path: /run/systemd/network/10-netplan-eth0.network
+    state: absent
+
+- name: Remove netplan.io package
+  apt:
+    name: netplan.io
+    state: absent
+    autoremove: true
+    purge: true
+
+- name: Find network files
+  find:
+    paths: /etc/systemd/network
+  register: network_files
+
+- name: Remove network files
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ network_files.files }}"
+
+- name: Copy network files
+  copy:
+    src: "{{ item }}"
+    dest: /etc/systemd/network/
+    owner: root
+    group: root
+    directory_mode: 0644 # rw-r--r--
+    mode: 0644
+  with_fileglob: "../network/{{ hostvars[inventory_hostname].network }}/*"

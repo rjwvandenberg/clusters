@@ -1,0 +1,4 @@
+[Match]
+Name=veth0
+[Network]
+DHCP=yes

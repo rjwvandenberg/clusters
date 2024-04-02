@@ -1,0 +1,17 @@
+- name: Setting up hosts
+  hosts: all
+  become: yes
+  tasks:
+  - name: Install hyperv modules
+    include_tasks: hyperv-vm.yaml
+
+  - name: Update packages
+    apt: 
+      update_cache: yes
+      upgrade: dist
+
+  - name: Copy network files
+    include_tasks: normalize-networking.yaml
+
+  - name: Reboot to apply changes
+    reboot:

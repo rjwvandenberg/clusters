@@ -1,5 +1,5 @@
 infra/vagrant/.vagrant
 infra/vagrant/boxfiles
 infra/vagrant/*.box
-
+inventory/
 cleanup/

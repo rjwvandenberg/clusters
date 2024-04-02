@@ -1,0 +1,10 @@
+# from a ubuntu23.10 base with ssh access
+  - name: Install hyperv guest modules
+    apt:
+      name:
+      - linux-virtual
+      - linux-cloud-tools-virtual
+      - linux-tools-virtual
+      update_cache: true
+    when:
+    - hostvars[inventory_hostname].type == "hyperv"

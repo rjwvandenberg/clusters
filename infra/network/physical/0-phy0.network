@@ -1,0 +1,4 @@
+[Match]
+Name=phy0
+[Network]
+DHCP=yes
