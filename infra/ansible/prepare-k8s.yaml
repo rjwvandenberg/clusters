@@ -1,0 +1,150 @@
+# Setup k8s prereqs for runc, containerd, cni, kubeadm, cilium
+# https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+# https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#kubeproxy-free
+# think this mostly sets it up correctly
+
+- name: check prereq
+  apt:
+    name:
+      - gpg
+    update_cache: true
+
+# Container runtime adjustments https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+# Dual stack networking https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/dual-stack-support/
+- name: Enable ip forwarding
+  copy:
+    src: ../k8s/20-ip-forwarding.conf
+    dest: /etc/sysctl.d/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable iptables on bridges
+  copy:
+    src: ../k8s/20-iptables-bridge.conf
+    dest: /etc/sysctl.d/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable modules for k8s
+  copy:
+    src: ../k8s/20-k8s-modules.conf
+    dest: /etc/modules-load.d/
+    owner: root
+    group: root
+    mode: 0644
+
+# Will autoselect cgroupdriver as systemd (k8s >= v1.22) https://kubernetes.io/docs/setup/production-environment/container-runtimes/#systemd-cgroup-driver
+
+# whoops forgot to remove swap in the ubuntu disk setup installer
+# Alternative is to enable NodeSwap featuregate: https://kubernetes.io/docs/concepts/architecture/nodes/#swap-memory
+# Reason for not applying the feature, secrets could be swapped to disk
+- name: Remove swap
+  command: swapoff -a
+
+- name: Remove swap permanently
+  command: sed -i '/swap/d' /etc/fstab
+
+# https://github.com/containerd/containerd/blob/v2.0.0-rc.0/docs/getting-started.md
+- name: Check Containerd
+  stat:
+    path: /usr/local/bin/containerd
+  register: hasContainerd
+
+- name: install containerd and containerd.service
+  script: ../k8s/scripts/install-containerd.sh
+  when: not hasContainerd.stat.exists
+
+- name: Create containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+    owner: root
+    group: root
+    mode: 0644
+  when: not hasContainerd.stat.exists
+
+# TODO: Need to verify containerd.toml against kubelet, crictl, nerdctl, were some docs systemd, grpc etc. Probably make a config and copy it into place, instead of replacing strings.
+- name: Create default config
+  shell: containerd config default > /etc/containerd/config.toml
+  when: not hasContainerd.stat.exists
+
+# https://github.com/kubernetes/kubernetes/blob/6673e7a93d8f0e81343309350e3ec7e7afc7fd73/cmd/kubeadm/app/phases/kubelet/flags_test.go#L82
+- name: Update runtime pause image to match Kubernetes 1.29
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'registry\.k8s\.io\/pause:3\.8'
+    replace: 'registry.k8s.io/pause:3.9'
+  when: not hasContainerd.stat.exists
+
+# https://github.com/containerd/containerd/blob/v2.0.0-rc.0/docs/cri/config.md#cgroup-driver
+- name: Update systemd cgroup in containerd config 
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: "ShimCgroup = ''"
+    replace: 'SystemdCgroup = true'
+  when: not hasContainerd.stat.exists
+
+# https://github.com/opencontainers/runc
+- name: Check runc
+  stat:
+    path: /usr/local/sbin/runc
+  register: hasRunc
+
+- name: Install runc
+  script: ../k8s/scripts/install-runc.sh
+  when: not hasRunc.stat.exists
+
+# https://github.com/containernetworking/plugins
+- name: Check cni plugins
+  stat:
+    path: /opt/cni/bin/bandwidth
+  register: hasCni
+
+- name: Install cni plugins
+  script: ../k8s/scripts/install-cni-plugins.sh
+  when: not hasCni.stat.exists
+
+# https://github.com/kubernetes-sigs/cri-tools
+- name: Check crictl
+  stat:
+    path: /usr/local/bin/crictl
+  register: hasCrictl
+
+- name: Install crictl
+  script: ../k8s/scripts/install-crictl.sh
+  when: not hasCrictl.stat.exists
+
+# https://github.com/containerd/nerdctl
+# TODO: configure nerdctl. maybe? seems to indicate it should work for cgroup v2, but lets make sure after installing https://github.com/containerd/nerdctl/blob/main/docs/faq.md#how-to-change-the-cgroup-driver
+# TODO https://github.com/containerd/nerdctl/blob/main/docs/faq.md#how-to-change-the-runtime
+# TODO: check buildkit
+# TODO: also doesn't hurt to check containerd and kubelet
+- name: Check nerdctl
+  stat:
+    path: /usr/local/bin/nerdctl
+  register: hasNerdctl
+
+- name: Install nerdctl
+  script: ../k8s/scripts/install-nerdctl.sh
+  when: not hasNerdctl.stat.exists
+
+# kubernetes
+- name: Add kubernetes repo key
+  apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key
+    keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add kubernetes repo
+  apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /
+    filename: kubernetes
+
+- name: Install kubernetes packages
+  apt:
+    name:
+      - kubelet=1.29*
+      - kubeadm=1.29*
+      - kubectl=1.29*
+    update_cache: true

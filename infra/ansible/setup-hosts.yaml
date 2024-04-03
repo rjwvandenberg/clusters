@@ -5,13 +5,19 @@
   - name: Install hyperv modules
     include_tasks: hyperv-vm.yaml
 
+  - name: Copy network files
+    include_tasks: normalize-networking.yaml
+
+  - name: Remove unused packages
+    include_tasks: remove-ubuntu2310.yaml
+  
   - name: Update packages
     apt: 
       update_cache: yes
       upgrade: dist
 
-  - name: Copy network files
-    include_tasks: normalize-networking.yaml
-
-  - name: Reboot to apply changes
+  - name: Prepare for k8s
+    include_tasks: prepare-k8s.yaml
+  
+  - name: Reboot to apply changes (networking & containerd)
     reboot:

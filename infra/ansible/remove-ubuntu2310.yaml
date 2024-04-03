@@ -1,0 +1,35 @@
+- name: check if snap is installed
+  command: which snap
+  register: hasSnap
+  ignore_errors: true # dont fail if not present
+
+- name: remove snaps
+  command: snap remove --purge ubuntu-desktop-installer gtk-common-themes bare lxd
+  when: hasSnap.rc != 1
+
+- name: remove snaps
+  command: snap remove --purge core22
+  when: hasSnap.rc != 1
+
+- name: remove snap
+  command: snap remove --purge snapd
+  when: hasSnap.rc != 1
+
+- name: remove packages
+  apt:
+    pkg:
+      - cloud-guest-utils
+      - cloud-initramfs-copymods
+      - cloud-initramfs-dyn-netconf
+      - landscape-common
+      - lxd-agent-loader
+      - open-vm-tools
+      - os-prober
+      - snapd
+      - thin-provisioning-tools
+      - ubuntu-advantage-tools
+      - ubuntu-pro-client-l10n
+      - ubuntu-pro-client
+    state: absent
+    autoremove: yes
+    purge: yes
