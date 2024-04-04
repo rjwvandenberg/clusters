@@ -63,28 +63,15 @@
     owner: root
     group: root
     mode: 0644
-  when: not hasContainerd.stat.exists
 
-# TODO: Need to verify containerd.toml against kubelet, crictl, nerdctl, were some docs systemd, grpc etc. Probably make a config and copy it into place, instead of replacing strings.
-- name: Create default config
-  shell: containerd config default > /etc/containerd/config.toml
-  when: not hasContainerd.stat.exists
-
-# https://github.com/kubernetes/kubernetes/blob/6673e7a93d8f0e81343309350e3ec7e7afc7fd73/cmd/kubeadm/app/phases/kubelet/flags_test.go#L82
-- name: Update runtime pause image to match Kubernetes 1.29
-  replace:
-    path: /etc/containerd/config.toml
-    regexp: 'registry\.k8s\.io\/pause:3\.8'
-    replace: 'registry.k8s.io/pause:3.9'
-  when: not hasContainerd.stat.exists
-
-# https://github.com/containerd/containerd/blob/v2.0.0-rc.0/docs/cri/config.md#cgroup-driver
-- name: Update systemd cgroup in containerd config 
-  replace:
-    path: /etc/containerd/config.toml
-    regexp: "ShimCgroup = ''"
-    replace: 'SystemdCgroup = true'
-  when: not hasContainerd.stat.exists
+# Containerd config generated with containerd config default, see file for changes made.
+- name: Copy containerd config
+  copy: 
+    src: ../k8s/configs/containerd.toml
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: 0644
 
 # https://github.com/opencontainers/runc
 - name: Check runc
@@ -117,10 +104,6 @@
   when: not hasCrictl.stat.exists
 
 # https://github.com/containerd/nerdctl
-# TODO: configure nerdctl. maybe? seems to indicate it should work for cgroup v2, but lets make sure after installing https://github.com/containerd/nerdctl/blob/main/docs/faq.md#how-to-change-the-cgroup-driver
-# TODO https://github.com/containerd/nerdctl/blob/main/docs/faq.md#how-to-change-the-runtime
-# TODO: check buildkit
-# TODO: also doesn't hurt to check containerd and kubelet
 - name: Check nerdctl
   stat:
     path: /usr/local/bin/nerdctl
@@ -129,6 +112,48 @@
 - name: Install nerdctl
   script: ../k8s/scripts/install-nerdctl.sh
   when: not hasNerdctl.stat.exists
+
+- name: Create nerdctl config directory
+  file:
+    path: /etc/nerdctl
+    state: directory
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy nerdctl config
+  copy: 
+    src: ../k8s/configs/nerdctl.toml
+    dest: /etc/nerdctl/
+    owner: root
+    group: root
+    mode: 0644
+
+# https://github.com/moby/buildkit
+- name: Check buildctl
+  stat:
+    path: /usr/local/bin/buildctl
+  register: hasBuildctl
+
+- name: Install buildctl for k8s.io namespace 
+  script: ../k8s/scripts/install-buildctl.sh
+  when: not hasBuildctl.stat.exists
+
+- name: Create buildkit config directory
+  file:
+    path: /etc/buildkit
+    state: directory
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy buildkitd config
+  copy: 
+    src: ../k8s/configs/buildkitd.toml
+    dest: /etc/buildkit/
+    owner: root
+    group: root
+    mode: 0644
 
 # kubernetes
 - name: Add kubernetes repo key

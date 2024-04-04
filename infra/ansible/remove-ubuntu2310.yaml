@@ -23,6 +23,7 @@
       - cloud-initramfs-dyn-netconf
       - landscape-common
       - lxd-agent-loader
+      - modemmanager
       - open-vm-tools
       - os-prober
       - snapd
