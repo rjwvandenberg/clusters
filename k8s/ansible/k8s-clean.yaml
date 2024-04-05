@@ -1,0 +1,4 @@
+# kubadm reset
+# do the things kubeadm recommends on reset
+# nerdctl system prune
+# and see if anything remains afterwards

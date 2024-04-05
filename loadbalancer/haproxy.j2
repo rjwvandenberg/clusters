@@ -1,0 +1,71 @@
+# https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md#options-for-software-load-balancing
+global
+    # default config from ubuntu
+    log /dev/log    local0
+    log /dev/log    local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+    # Default SSL material locations
+    ca-base /etc/ssl/certs
+    crt-base /etc/ssl/private
+
+    # generated 2024-04-05, Mozilla Guideline v5.7, HAProxy 2.6.15-1ubuntu2, OpenSSL 3.0.10, modern configuration
+    # https://ssl-config.mozilla.org/#server=haproxy&version=2.6.15-1ubuntu2&config=modern&openssl=3.0.10&guideline=5.7 
+    # modern configuration
+    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+    ssl-default-bind-options prefer-client-ciphers no-sslv3 no-tlsv10 no-tlsv11 no-tlsv12 no-tls-tickets
+
+    ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+    ssl-default-server-options no-sslv3 no-tlsv10 no-tlsv11 no-tlsv12 no-tls-tickets
+
+defaults
+    # default config from ubuntu, slightly updated
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    option http-server-close
+    option forwardfor except 127.0.0.0/16
+    timeout connect 5s
+    timeout client  5s
+    timeout server  5s
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
+
+#frontend fe_test 
+#    # mozilla auto generated test frontend
+#    mode    http
+#    bind    :79
+#    # removed ssl part for now
+#
+#    # HSTS (63071999 seconds)
+#    http-response set-header Strict-Transport-Security max-age=63071999
+
+frontend apiserver
+    # ha-conderations.md - apiserver frontend which proxies to control plane nodes
+    bind {{ hostvars[inventory_hostname].loadbalancer.internal_ip }}:{{ hostvars[inventory_hostname].loadbalancer_apiserver_port }}
+    mode tcp
+    option tcplog
+    default_backend apiserverbackend
+
+backend apiserverbackend
+    option httpchk GET /healthz
+    http-check expect status 200
+    mode tcp
+    option ssl-hello-chk
+    balance roundrobin
+{% for name in groups['all'] %}
+{% if hostvars[name].k8s is defined and (hostvars[name].k8s.type == "bootstrap" or hostvars[name].k8s.type == "control") %}
+        server {{ name }} {{ hostvars[name].k8s.internal_ip }}:{{ hostvars[name].apiserver_port }} check
+{% endif %}
+{% endfor %}

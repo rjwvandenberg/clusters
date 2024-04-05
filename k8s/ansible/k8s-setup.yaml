@@ -1,0 +1,26 @@
+- name: Setup k8s cluster
+  hosts: all
+  become: yes
+  tasks:
+  - name: Setup external loadbalancer
+    include_tasks: loadbalancer.yaml
+    when:
+    - hostvars[inventory_hostname].loadbalancer is defined
+
+  - name: Boostrap control plane
+    include_tasks: bootstrap.yaml
+    when:
+    - hostvars[inventory_hostname].k8s.type == "bootstrap"
+
+  - name: Join control plane nodes
+    include_tasks: control-plane.yaml
+    when:
+    - hostvars[inventory_hostname].k8s.type == "control" 
+
+  - name: Join worker nodes
+    include_tasks: worker.yaml
+    when:
+    - hostvars[inventory_hostname].k8s.type == "worker"
+
+  - name: Reboot if changes were made
+    reboot: 
