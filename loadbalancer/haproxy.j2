@@ -1,4 +1,5 @@
 # https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md#options-for-software-load-balancing
+# added it as an option, will not work without further integration
 global
     # default config from ubuntu
     log /dev/log    local0
@@ -50,6 +51,9 @@ defaults
 #
 #    # HSTS (63071999 seconds)
 #    http-response set-header Strict-Transport-Security max-age=63071999
+
+
+# ---------------- apiserver load balancing --------------------------------------
 
 frontend apiserver
     # ha-conderations.md - apiserver frontend which proxies to control plane nodes

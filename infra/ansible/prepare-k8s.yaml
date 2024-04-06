@@ -46,6 +46,11 @@
 - name: Remove swap permanently
   command: sed -i '/swap/d' /etc/fstab
 
+- name: Remove swap file
+  file:
+    path: /swap.img
+    state: absent
+
 # https://github.com/containerd/containerd/blob/v2.0.0-rc.0/docs/getting-started.md
 - name: Check Containerd
   stat:

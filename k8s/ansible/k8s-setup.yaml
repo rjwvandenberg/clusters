@@ -1,6 +1,9 @@
 - name: Setup k8s cluster
   hosts: all
   become: yes
+  vars_files:
+  - ../../inventory/k8s-vars.yaml
+  
   tasks:
   - name: Setup external loadbalancer
     include_tasks: loadbalancer.yaml
@@ -22,5 +25,5 @@
     when:
     - hostvars[inventory_hostname].k8s.type == "worker"
 
-  - name: Reboot if changes were made
-    reboot: 
+  #- name: Reboot
+  #  reboot: 

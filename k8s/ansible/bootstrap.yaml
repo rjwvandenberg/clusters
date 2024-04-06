@@ -1,2 +1,43 @@
 # Bootstrap the first control plane node with kubeadm
 
+- name: Check if cluster already initialized
+  stat: path=/etc/kubernetes/kubelet.conf
+  register: present
+
+- debug: msg="Cluster already initialized, since /etc/kubernetes/kubelet.conf exists. Consider using kubeadm reset if you want to create a new cluster."
+  when: present.stat.exists
+
+- name: Copy configuration
+  template:
+    src: ../configs/init.j2
+    dest: /root/init.yaml
+    owner: root
+    group: root
+    mode: 0400
+
+# init adds deprecated flags /var/lib/kubelet/kubeadm-flags.env
+- name: Initialize cluster
+  command: kubeadm init --config=/root/init.yaml
+  register: init
+  when: not present.stat.exists
+
+- debug: msg={{ init.stdout_lines }}
+  when: not present.stat.exists and init.rc == 0
+
+- name: Kube directory for user
+  file:
+    path: /home/{{user}}/.kube
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: 0755
+  
+- name: Copy kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{user}}/.kube/config
+    remote_src: true
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: 0755
+  
