@@ -67,7 +67,7 @@
     state: directory
     owner: root
     group: root
-    mode: 0644
+    mode: 0755  # need x to enter a directory
 
 # Containerd config generated with containerd config default, see file for changes made.
 - name: Copy containerd config
@@ -124,7 +124,7 @@
     state: directory
     owner: root
     group: root
-    mode: 0644
+    mode: 0755
 
 - name: Copy nerdctl config
   copy: 
@@ -150,7 +150,7 @@
     state: directory
     owner: root
     group: root
-    mode: 0644
+    mode: 0755
 
 - name: Copy buildkitd config
   copy: 
