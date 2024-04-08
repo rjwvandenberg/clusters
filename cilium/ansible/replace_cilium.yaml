@@ -1,0 +1,24 @@
+- name: Replace cilium
+  hosts: all
+  become: yes
+  tasks:
+
+  - name: copy cilium variables
+    copy:
+      src: ../../inventory/cilium-install-vars.yaml
+      dest: /root/cilium.yaml
+      owner: root
+      group: root
+      mode: 0400
+    when: 
+    - hostvars[inventory_hostname].k8s.type == "bootstrap"
+
+  # TODO: look at upgrade, might have side effects, so uninstall, install for now
+  - name: uinstall cilium
+
+  - name: install cilium
+    command: cilium install --reuse-values --values /root/cilium.yaml
+    environment:
+      KUBECONFIG: /etc/kubernetes/admin.conf 
+    when: 
+    - hostvars[inventory_hostname].k8s.type == "bootstrap"

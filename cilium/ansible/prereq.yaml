@@ -1,0 +1,39 @@
+- name: privileged block
+  become: yes
+  block: 
+  # https://github.com/cilium/cilium
+  - name: Check Cilium Cli
+    stat:
+      path: /usr/local/bin/cilium
+    register: hasCli
+
+  - name: Install cilium cli
+    script: ../scripts/install-cilium-cli.sh
+    when: not hasCli.stat.exists
+
+  # Hubble, observability in cilium
+  # https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
+  - name: Check Hubble Cli
+    stat:
+      path: /usr/local/bin/hubble
+    register: hasHubble
+
+  - name: Install hubble cli
+    script: ../scripts/install-hubble-cli.sh
+    when: not hasHubble.stat.exists
+
+  # Helm https://github.com/helm/helm
+  - name: Check helm cli
+    stat:
+      path: /usr/local/bin/helm
+    register: hasHelm
+
+  - name: Install helm cli
+    script: ../scripts/install-helm-cli.sh
+    when: not hasHelm.stat.exists
+
+  # TODO: figure out a clean way to detect it was previously installed by its result
+  - name: Install helm diff plugin
+    command: helm plugin install https://github.com/databus23/helm-diff
+    register: result
+    ignore_errors: true
