@@ -36,11 +36,10 @@
   with_items: "{{ network_files.files }}"
 
 - name: Copy network files
-  copy:
+  template:
     src: "{{ item }}"
     dest: /etc/systemd/network/
     owner: root
     group: root
-    directory_mode: 0644 # rw-r--r--
     mode: 0644
   with_fileglob: "../network/{{ hostvars[inventory_hostname].network }}/*"

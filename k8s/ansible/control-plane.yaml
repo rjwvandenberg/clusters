@@ -1,1 +1,3 @@
 # Add a control plane node to the cluster
+
+# https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/#steps-for-the-rest-of-the-control-plane-nodes

@@ -31,7 +31,7 @@ defaults
     option  httplog
     option  dontlognull
     option http-server-close
-    option forwardfor except 127.0.0.0/16
+    option forwardfor except 127.0.0.0/24
     timeout connect 5s
     timeout client  5s
     timeout server  5s
@@ -43,21 +43,21 @@ defaults
     errorfile 503 /etc/haproxy/errors/503.http
     errorfile 504 /etc/haproxy/errors/504.http
 
-#frontend fe_test 
-#    # mozilla auto generated test frontend
-#    mode    http
-#    bind    :79
-#    # removed ssl part for now
-#
-#    # HSTS (63071999 seconds)
-#    http-response set-header Strict-Transport-Security max-age=63071999
+frontend smile 
+    mode    http
+    bind    :8080
+    # https://docs.haproxy.org/2.6/configuration.html#4.2-http-request%20return
+    http-request return status 200 content-type "text/plain" lf-string ":)"
+    #http-request deny if !{ path -i beg / }
+    #errorfile 200 /etc/haproxy/errors/200.http
 
 
 # ---------------- apiserver load balancing --------------------------------------
 
 frontend apiserver
     # ha-conderations.md - apiserver frontend which proxies to control plane nodes
-    bind {{ hostvars[inventory_hostname].loadbalancer.internal_ip }}:{{ hostvars[inventory_hostname].loadbalancer_apiserver_port }}
+    #bind {{ loadbalancer.internal_ip }}:{{ loadbalancer.apiserver_port }}
+    bind *:{{ loadbalancer.apiserver_port }}
     mode tcp
     option tcplog
     default_backend apiserverbackend
@@ -70,6 +70,6 @@ backend apiserverbackend
     balance roundrobin
 {% for name in groups['all'] %}
 {% if hostvars[name].k8s is defined and (hostvars[name].k8s.type == "bootstrap" or hostvars[name].k8s.type == "control") %}
-        server {{ name }} {{ hostvars[name].k8s.internal_ip }}:{{ hostvars[name].apiserver_port }} check
+        server {{ name }} {{ hostvars[name].k8s.internal_ip }}:{{ hostvars[name].k8s.apiserver_port }} check
 {% endif %}
 {% endfor %}

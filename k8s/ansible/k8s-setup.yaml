@@ -1,17 +1,30 @@
 - name: Setup k8s cluster
   hosts: all
-  become: yes
-  vars_files:
-  - ../../inventory/k8s-vars.yaml
-  
-  tasks:
-  - name: Setup external loadbalancer
-    include_tasks: loadbalancer.yaml
-    when:
-    - hostvars[inventory_hostname].loadbalancer is defined
 
-  - name: Boostrap control plane
+  tasks:
+  # TODO: reenable loadbalancer
+  #- name: Setup external loadbalancer
+  #  include_tasks: ../../loadbalancer/ansible/loadbalancer.yaml
+  #  when:
+  #  - hostvars[inventory_hostname].loadbalancer is defined
+
+  - name: Boostrap control plane      
     include_tasks: bootstrap.yaml
+    when:
+    - hostvars[inventory_hostname].k8s.type == "bootstrap"
+
+  - name: Install cilium prerequisites
+    include_tasks: ../../cilium/ansible/prereq.yaml
+    when: 
+    - hostvars[inventory_hostname].k8s.type == "bootstrap"
+
+  - name: Install CNI plugin Cilium
+    include_tasks: ../../cilium/ansible/setup_cilium.yaml
+    when:
+    - hostvars[inventory_hostname].k8s.type == "bootstrap"
+
+  - name: Create join token
+    include_tasks: k8s-create-tokens.yaml
     when:
     - hostvars[inventory_hostname].k8s.type == "bootstrap"
 
@@ -20,10 +33,13 @@
     when:
     - hostvars[inventory_hostname].k8s.type == "control" 
 
+  # TODO: delete local secrets/hash  
+
   - name: Join worker nodes
     include_tasks: worker.yaml
     when:
     - hostvars[inventory_hostname].k8s.type == "worker"
 
-  #- name: Reboot
-  #  reboot: 
+  - name: Reboot
+    become: yes
+    reboot: 

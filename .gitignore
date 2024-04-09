@@ -4,3 +4,4 @@ infra/vagrant/*.box
 inventory/
 cleanup/
 logs/
+secrets/

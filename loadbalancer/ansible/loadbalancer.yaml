@@ -1,0 +1,39 @@
+# https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md#options-for-software-load-balancing
+# let's try haproxy 2.6.x
+# https://docs.haproxy.org/2.6/intro.html
+
+- name: load loadbalancer vars
+  include_vars:
+    file: ../../inventory/loadbalancer.yaml
+    name: loadbalancer
+- name: load kubernetes vars
+  include_vars:
+    file: ../../inventory/k8s-vars.yaml
+    name: kubernetes
+
+- name: privileged block
+  become: yes
+  block:
+  - name: Create haproxy config folder
+    file:
+      path: /etc/haproxy
+      state: directory
+      owner: root
+      group: root
+      mode: 0755 
+
+  # copy config and fill in template values marked with {% value %}
+  - name: Generate haproxy config
+    template:
+      backup: true
+      src: ../configs/haproxy.j2
+      dest: /etc/haproxy/haproxy.cfg
+      owner: root
+      group: root
+      mode: 0644
+
+  # systemd service gets enabled on install with config at /etc/haproxy/haproxy.cfg
+  - name: install haproxy
+    apt:
+      pkg:
+      - haproxy

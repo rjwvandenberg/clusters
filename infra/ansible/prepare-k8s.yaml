@@ -7,6 +7,7 @@
   apt:
     name:
       - gpg
+      - python3-kubernetes    # for ansible plugins
     update_cache: true
 
 # Container runtime adjustments https://kubernetes.io/docs/setup/production-environment/container-runtimes/

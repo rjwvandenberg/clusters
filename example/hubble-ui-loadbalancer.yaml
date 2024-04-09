@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-ui-lb
+  namespace: kube-system   # needed to put the service in the same namespace as the deployment
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: hubble-ui
+  ports:
+  - port: 80
+    targetPort: 8081

@@ -1,0 +1,11 @@
+[Unit]
+Description=generate machine-id if not present
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=systemd-machine-id-setup
+
+[Install]
+WantedBy=network.target

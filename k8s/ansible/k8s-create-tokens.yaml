@@ -1,0 +1,42 @@
+# TODO: review security of these commands and how they're transferred (ok for now on lan)
+
+- name: privileged group
+  become: yes
+  block: 
+  - name: Create token
+    shell: kubeadm token create > /root/token-{{ item }}
+    with_items: "{{ groups['all'] }}"
+    when: hostvars[item].k8s is defined and (hostvars[item].k8s.type == "worker" or hostvars[item].k8s.type == "control")
+
+  - name: Copy token
+    fetch:
+      src: /root/token-{{ item }}
+      dest: ../../secrets/token-{{ item }}
+      flat: true
+    with_items: "{{ groups['all'] }}"
+    when: hostvars[item].k8s is defined and (hostvars[item].k8s.type == "worker" or hostvars[item].k8s.type == "control")
+
+  - name: Delete token
+    file:
+      path: /root/token-{{ item }}
+      state: absent
+    with_items: "{{ groups['all'] }}"
+    when: hostvars[item].k8s is defined and (hostvars[item].k8s.type == "worker" or hostvars[item].k8s.type == "control")
+
+
+- name: privileged group
+  become: yes
+  block:
+  - name: Create hash
+    shell: openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' > /root/hash
+
+  - name: Copy hash
+    fetch: 
+      src: /root/hash
+      dest: ../../secrets/hash
+      flat: true
+  
+  - name: Delete hash
+    file:
+      path: /root/hash
+      state: absent

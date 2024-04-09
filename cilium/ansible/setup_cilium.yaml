@@ -10,4 +10,4 @@
     namespace: kube-system
     chart_ref: cilium/cilium
     chart_version: 1.15.3
-    values: "{{ lookup('file', '../../inventory/cilium-install-vars.yaml') | from_yaml }}"
+    values: "{{ lookup('file', '../../inventory/cilium-vars.yaml') | from_yaml }}"

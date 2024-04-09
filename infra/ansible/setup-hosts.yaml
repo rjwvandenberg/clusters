@@ -10,6 +10,7 @@
 
   - name: Remove unused packages
     include_tasks: remove-ubuntu2310.yaml
+    when: hostvars[inventory_hostname].os == "ubuntu2310-fresh"
   
   - name: Update packages
     apt: 
