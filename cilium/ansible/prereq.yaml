@@ -10,6 +10,8 @@
   - name: Install cilium cli
     script: ../scripts/install-cilium-cli.sh
     when: not hasCli.stat.exists
+    environment:
+      ARCH: hostvars[inventory_hostname].arch
 
   # Hubble, observability in cilium
   # https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
@@ -21,6 +23,8 @@
   - name: Install hubble cli
     script: ../scripts/install-hubble-cli.sh
     when: not hasHubble.stat.exists
+    environment:
+      ARCH: hostvars[inventory_hostname].arch
 
   # Helm https://github.com/helm/helm
   - name: Check helm cli
@@ -31,6 +35,8 @@
   - name: Install helm cli
     script: ../scripts/install-helm-cli.sh
     when: not hasHelm.stat.exists
+    environment:
+      ARCH: hostvars[inventory_hostname].arch
 
   # TODO: figure out a clean way to detect it was previously installed by its result
   - name: Install helm diff plugin

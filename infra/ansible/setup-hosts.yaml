@@ -7,6 +7,7 @@
 
   - name: Copy network files
     include_tasks: normalize-networking.yaml
+    # TODO: add toggle for networking, or just skip this and use cloudinit in other deployment scenarios?
 
   - name: Remove unused packages
     include_tasks: remove-ubuntu2310.yaml

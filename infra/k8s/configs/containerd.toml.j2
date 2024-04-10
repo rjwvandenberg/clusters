@@ -165,7 +165,7 @@ imports = []
     disable_connections = false
 
   [plugins.'io.containerd.runtime.v2.task']
-    platforms = ['linux/amd64']
+    platforms = ['linux/{{ hostvars[inventory_hostname].arch }}']
     sched_core = false
 
   [plugins.'io.containerd.service.v1.diff-service']
