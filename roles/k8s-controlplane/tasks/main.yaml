@@ -1,0 +1,17 @@
+- debug:
+    msg: "{{ inventory_hostname }}: architecure {{ansible_facts['architecture']}} is not supported"
+  when: arch == "Unsupported"
+- meta: end_host
+  when: arch == "Unsupported"
+
+- debug: 
+    msg: "{{ ansible_facts['distribution'] }} is not supported"
+  when: ansible_facts['distribution'] != "Ubuntu"
+- meta: end_host
+  when: ansible_facts['distribution'] != "Ubuntu"
+
+- include_tasks: bootstrap.yaml
+  when: bootstrap
+
+- include_tasks: join.yaml
+  when: not bootstrap

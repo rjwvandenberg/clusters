@@ -1,0 +1,57 @@
+# https://github.com/containerd/containerd/blob/v2.0.0-rc.0/docs/getting-started.md
+- name: Check Containerd
+  stat:
+    path: /usr/local/bin/containerd
+  register: hasContainerd
+
+- name: install containerd
+  script: install-generic.sh
+  when: not hasContainerd.stat.exists
+  vars:
+    version: 2.0.0-rc.0
+    hashes:
+      arm64: d89d262c8edeb94472a4cd21a7aff7dda270c3bb0ddf2c58d19d2de18153b21f
+      amd64: ed42e8824603660787051f49ae413c8dc109345502072e1be0976824a7ff458e
+  environment:
+      URL: "https://github.com/containerd/containerd/releases/download/v{{version}}/containerd-{{version}}-linux-{{arch}}.tar.gz"
+      CHECKSUM: "{{ hashes[arch] }}"
+      UNTAR_PATH: /usr/local
+      OPTIONS: --no-same-owner
+
+- name: Create path
+  file:
+    path: /usr/local/lib/systemd/system/
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy containerd.service
+  copy:
+    src: containerd.service
+    dest: /usr/local/lib/systemd/system/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Create containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+    owner: root
+    group: root
+    mode: 0755  # need x to enter a directory
+
+# Containerd config generated with containerd config default, see file for changes made.
+- name: Copy containerd config
+  template: 
+    src: containerd.toml.j2
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable containerd
+  command: systemctl enable containerd
+  when: not hasContainerd.stat.exists
+

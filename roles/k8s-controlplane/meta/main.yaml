@@ -1,0 +1,9 @@
+# TODO: Could define dependencies, but would require additional parameter passing
+#       But without the dependency, would need to duplicate k8s-common/vars and
+#       remember the dependencies yourself.
+#       
+#dependencies:
+#- role: k8s-common
+#  reboot: 
+#- role: k8s-tools
+#  build_tools: 

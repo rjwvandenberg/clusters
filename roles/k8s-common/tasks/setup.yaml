@@ -1,0 +1,86 @@
+- debug:
+    msg: "Installing kubernetes prerequisites..."
+
+- become: true
+  block: 
+
+  - name: update apt
+    apt: 
+      update_cache: true
+      upgrade: dist
+
+  # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+  # https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#kubeproxy-free
+  - name: check prereq
+    apt:
+      pkg:
+        - gpg
+        - python3-kubernetes    # for ansible plugins
+
+  # Container runtime adjustments https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+  # Dual stack networking https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/dual-stack-support/
+  - name: Enable ip forwarding
+    copy:
+      src: 20-ip-forwarding.conf
+      dest: /etc/sysctl.d/
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Enable iptables on bridges
+    copy:
+      src: 20-iptables-bridge.conf
+      dest: /etc/sysctl.d/
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Enable modules for k8s
+    copy:
+      src: 20-k8s-modules.conf
+      dest: /etc/modules-load.d/
+      owner: root
+      group: root
+      mode: 0644
+
+  # Alternative is to enable NodeSwap featuregate: https://kubernetes.io/docs/concepts/architecture/nodes/#swap-memory
+  # Reason for not applying the feature, secrets could be swapped to disk
+  - name: Remove swap
+    command: swapoff -a
+
+  - name: Remove swap permanently
+    command: sed -i '/swap/d' /etc/fstab
+
+  - name: Remove swap file
+    file:
+      path: /swap.img
+      state: absent
+
+  - include_tasks: containerd.yaml
+
+  - include_tasks: runc.yaml
+
+  - include_tasks: cni_plugins.yaml
+
+  # kubernetes
+  - name: Add kubernetes repo key
+    apt_key:
+      url: https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key
+      keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+  - name: Add kubernetes repo
+    apt_repository:
+      repo: deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /
+      filename: kubernetes
+
+  - name: Install kubernetes packages
+    apt:
+      name:
+        - kubelet=1.29*
+        - kubeadm=1.29*
+        - kubectl=1.29*
+      update_cache: true
+
+  - name: Rebooting to apply changes...
+    reboot:
+    when: reboot

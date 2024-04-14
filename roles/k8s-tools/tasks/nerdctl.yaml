@@ -1,0 +1,39 @@
+- become: true
+  block:
+  # https://github.com/containerd/nerdctl
+  - name: Check nerdctl
+    stat:
+      path: /usr/local/bin/nerdctl
+    register: hasNerdctl
+
+  - name: Install nerdctl
+    script: install-generic.sh
+    when: not hasNerdctl.stat.exists
+    vars:
+      version: 1.7.5
+      hashes:
+        arm64: a53d87fc7d1f4ffeec55e5e08d2397b02ada0d334874c3cece306ad36f828a6c
+        amd64: 775f8bddd5e93acc4162c568dd6b84d5925549180991b83cfd4b7e33d4844921 
+    environment:
+        URL: https://github.com/containerd/nerdctl/releases/download/v{{version}}/nerdctl-{{version}}-linux-{{arch}}.tar.gz 
+        CHECKSUM: "{{ hashes[arch] }}"
+        UNTAR_PATH: /usr/local/bin
+        OPTIONS: --no-same-owner
+        FILTER: nerdctl
+
+  - name: Create nerdctl config directory
+    file:
+      path: /etc/nerdctl
+      state: directory
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: Copy nerdctl config
+    copy: 
+      src: nerdctl.toml
+      dest: /etc/nerdctl/
+      owner: root
+      group: root
+      mode: 0644
+

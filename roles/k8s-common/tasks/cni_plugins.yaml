@@ -1,0 +1,28 @@
+# https://github.com/containernetworking/plugins
+- name: Check cni plugins
+  stat:
+    path: /opt/cni/bin/bandwidth
+  register: hasCni
+
+- name: Create cni plugin folder
+  file:
+    path: /opt/cni/bin
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  when: not hasCni.stat.exists
+
+- name: Install cni plugins
+  script: install-generic.sh
+  when: not hasCni.stat.exists
+  vars:
+    version: v1.4.1
+    hashes:
+      arm64: 72644e13557cda8a5b39baf97fc5e93d23fdf7baba7700000e7e9efd8bdf9234
+      amd64: 1511f6c003ace805eafeb1132727791326283cff88a923d76329e1892bba7a10
+  environment:
+      URL: https://github.com/containernetworking/plugins/releases/download/{{version}}/cni-plugins-linux-{{arch}}-{{version}}.tgz
+      CHECKSUM: "{{ hashes[arch] }}"
+      UNTAR_PATH: /opt/cni/bin
+      OPTIONS: --no-same-owner

@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/role-arg-spec.json
+argument_specs:
+  main:
+    short_description: Join the cluster as a worker
+    options:
+      config:
+        type: dict
+        required: true
+      controller:
+        type: str
+        required: true

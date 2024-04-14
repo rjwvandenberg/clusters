@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/role-arg-spec.json
+argument_specs:
+  main:
+    short_description: Join (or bootstrap) the control plane
+    options:
+      bootstrap:
+        type: bool
+        default: false
+      config:
+        type: dict
+        required: true

@@ -1,0 +1,46 @@
+# TODO: review loading of hash and token
+- debug:
+    msg: "{{ inventory_hostname }}: architecure {{ansible_facts['architecture']}} is not supported"
+  when: arch == "Unsupported"
+- meta: end_host
+  when: arch == "Unsupported"
+
+- debug: 
+    msg: "{{ ansible_facts['distribution'] }} is not supported"
+  when: ansible_facts['distribution'] != "Ubuntu"
+- meta: end_host
+  when: ansible_facts['distribution'] != "Ubuntu"
+
+- name: privileged block
+  become: true
+  block:
+  - name: Check if node already joined
+    stat: path=/etc/kubernetes/pki/ca.crt
+    register: joined
+  
+  # retrieve a join token and hash
+  - name: get token and hash
+    include_tasks: create_token.yaml
+
+  - name: Copy JoinConfiguration
+    template:
+      src: join.j2
+      dest: /root/join.yaml
+      owner: root
+      group: root
+      mode: 0400
+    when: not joined.stat.exists
+    no_log: true
+
+  - name: reset token and hash
+    set_fact:
+      hash: ""
+      token: ""
+    no_log: true
+
+  - name: Join cluster
+    command: kubeadm join --config=/root/join.yaml
+    when: not joined.stat.exists
+
+  - debug: msg="Node already contains kubelet config. Consider draining the node and running kubeadm reset"
+    when: joined.stat.exists

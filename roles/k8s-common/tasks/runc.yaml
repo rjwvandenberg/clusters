@@ -1,0 +1,18 @@
+# https://github.com/opencontainers/runc
+- name: Check runc
+  stat:
+    path: /usr/local/sbin/runc
+  register: hasRunc
+
+- name: Install runc
+  script: install-runc.sh
+  when: not hasRunc.stat.exists
+  vars:
+    version: 1.2.0-rc.1
+    hashes:
+      arm64: 08702e40d645122fb48b60539e6120133d962147a602179b69cb7558e118e33a
+      amd64: 57fbfc33a20ca3ee13ec0f81b2e8798a59b3f2de5e0d703609f4eb165127f0c6
+  environment:
+      URL: https://github.com/opencontainers/runc/releases/download/v{{version}}/runc.{{arch}}
+      ARCH: "{{ arch }}"
+      CHECKSUM: "{{ hashes[arch] }}"

@@ -1,0 +1,21 @@
+# Hubble, observability in cilium
+# https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
+- name: Check Hubble Cli
+  stat:
+    path: /usr/local/bin/hubble
+  register: hasHubble
+
+- name: Install hubble cli
+  become: true
+  script: install-generic.sh
+  when: not hasHubble.stat.exists
+  vars:
+    version: v0.13.2
+    hashes:
+      arm64: 0eb69c778e6d64f5587ed5151ebf8d2e85bee23ae4a26282cccc6a97af3f8ad3
+      amd64: d4872683bc2da5d1175b544452845c56be169c8fef0768d9bd5d710add64bd6b
+  environment:
+      URL: https://github.com/cilium/hubble/releases/download/{{version}}/hubble-linux-{{arch}}.tar.gz
+      CHECKSUM: "{{ hashes[arch] }}"
+      UNTAR_PATH: /usr/local/bin
+      OPTIONS: --no-same-owner

@@ -1,0 +1,18 @@
+# TODO: review security of these commands and how they're transferred (ok for now on lan)
+- name: Create token
+  shell: kubeadm token create
+  delegate_to: "{{ controller }}"
+  register: token
+  no_log: true
+- set_fact:
+    token: "{{ token.stdout_lines[0] | trim }}"
+  no_log: true
+
+- name: Create hash
+  shell: openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //'
+  delegate_to: "{{ controller }}"
+  register: hash
+  no_log: true
+- set_fact:
+    hash: "{{ hash.stdout_lines[0] | trim }}"
+  no_log: true

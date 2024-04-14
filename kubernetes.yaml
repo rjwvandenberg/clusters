@@ -1,0 +1,51 @@
+# Setup a single k8s cluster, requires at least one control plane node with group name 'bootstrap' attached to it. 
+# Requires open ports on all hosts in the cluster: https://kubernetes.io/docs/reference/networking/ports-and-protocols/
+# And open ports for cilium: https://docs.cilium.io/en/stable/operations/system_requirements/
+# Required extra vars:
+# kubernetesconfigpath=filepath   # https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/
+# ciliumconfigpath=filepath       # https://docs.cilium.io/en/stable/helm-reference/
+- name: Load required variables
+  hosts: kubernetes
+  tasks:
+  - set_fact:
+      kubernetes_config: "{{ lookup('file', kubernetesconfigpath | mandatory) | from_yaml }}"
+      cilium_config: "{{ lookup('file', ciliumconfigpath | mandatory) }}"
+
+- name: Bootstrap kubernetes cluster 
+  hosts: kubernetes:&bootstrap
+  roles: 
+  - role: k8s-common
+    reboot: false
+  - role: k8s-tools
+    build_tools: false
+  - role: k8s-controlplane
+    bootstrap: true
+    config: "{{ kubernetes_config }}"
+  - role: cilium
+    cilium_config_contents: "{{ cilium_config }}"
+
+- name: Join control plane
+  hosts: kubernetes:&controlplane:!bootstrap
+  roles:
+  - role: k8s-common
+    reboot: false
+  - role: k8s-tools
+    build_tools: false
+  - role: k8s-controlplane
+    bootstrap: false
+    config: "{{ kubernetes_config }}"
+
+- name: Determine bootstrap controller
+  hosts: all
+  tasks:
+  - set_fact: 
+      k8s_controller: "{{ (groups['bootstrap'] |intersect(ansible_play_hosts_all))[0] }}"
+
+- name: Join workers
+  hosts: kubernetes:&worker
+  roles:
+  - role: k8s-common
+    reboot: false
+  - role: k8s-worker
+    config: "{{ kubernetes_config }}"
+    controller: "{{ k8s_controller }}"

@@ -1,0 +1,56 @@
+- become: true
+  block:
+  # https://github.com/moby/buildkit
+  - name: Check buildctl
+    stat:
+      path: /usr/local/bin/buildctl
+    register: hasBuildctl
+
+  - name: Install buildctl for k8s.io namespace 
+    script: install-generic.sh
+    when: not hasBuildctl.stat.exists
+    vars:
+      version: v0.13.1
+      hashes:
+        arm64: 9e1478af43ba7ac6635cae30a8dda3ebce4dca70a8def939ac64ee395d03d647
+        amd64: 5d4a6ef438851d7a0b22d17c7e806651c24c0982ddd6af8c02117fca84f167ec 
+    environment:
+        URL: https://github.com/moby/buildkit/releases/download/{{version}}/buildkit-{{version}}.linux-{{arch}}.tar.gz 
+        CHECKSUM: "{{ hashes[arch] }}"
+        UNTAR_PATH: /usr/local
+        OPTIONS: --no-same-owner
+
+  - name: Copy buildkit socket
+    copy:
+      src: buildkit.socket
+      dest: /usr/local/lib/systemd/system/
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Copy buildkit service
+    copy:
+      src: buildkit.service
+      dest: /usr/local/lib/systemd/system/
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Enable buildkit socket
+    command: systemctl enable buildkit.socket 
+
+  - name: Create buildkit config directory
+    file:
+      path: /etc/buildkit
+      state: directory
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: Copy buildkitd config
+    copy: 
+      src: buildkitd.toml
+      dest: /etc/buildkit/
+      owner: root
+      group: root
+      mode: 0644

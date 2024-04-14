@@ -1,0 +1,6 @@
+- include_tasks: buildkit.yaml
+  when: build_tools
+
+- include_tasks: crictl.yaml
+
+- include_tasks: nerdctl.yaml

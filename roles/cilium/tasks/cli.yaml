@@ -1,0 +1,20 @@
+# https://github.com/cilium/cilium
+- name: Check Cilium Cli
+  stat:
+    path: /usr/local/bin/cilium
+  register: hasCli
+
+- name: Install cilium cli
+  become: true
+  script: install-generic.sh
+  when: not hasCli.stat.exists
+  vars:
+    version: v0.16.4
+    hashes:
+      arm64: d83461431b5c853888c4213f9276991a95806960a87af64f2131b7e445ee9ce0
+      amd64: cbc30655a886ee05c8ffb5eff3ad6f92d37f129c49f4515ce258658f9078fb10 
+  environment:
+      URL: https://github.com/cilium/cilium-cli/releases/download/{{version}}/cilium-linux-{{arch}}.tar.gz
+      CHECKSUM: "{{ hashes[arch] }}"
+      UNTAR_PATH: /usr/local/bin
+      OPTIONS: --no-same-owner

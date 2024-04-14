@@ -1,0 +1,21 @@
+- become: true
+  block:
+  # https://github.com/kubernetes-sigs/cri-tools
+  - name: Check crictl
+    stat:
+      path: /usr/local/bin/crictl
+    register: hasCrictl
+
+  - name: Install crictl
+    script: install-generic.sh
+    when: not hasCrictl.stat.exists
+    vars:
+      version: v1.29.0
+      hashes:
+        arm64: 0b615cfa00c331fb9c4524f3d4058a61cc487b33a3436d1269e7832cf283f925
+        amd64: d16a1ffb3938f5a19d5c8f45d363bd091ef89c0bc4d44ad16b933eede32fdcbb
+    environment:
+        URL: https://github.com/kubernetes-sigs/cri-tools/releases/download/{{version}}/crictl-{{version}}-linux-{{arch}}.tar.gz 
+        CHECKSUM: "{{ hashes[arch] }}"
+        UNTAR_PATH: /usr/local/bin
+        OPTIONS: --no-same-owner

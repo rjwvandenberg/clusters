@@ -1,0 +1,7 @@
+k8s_path: ../../../files/kubernetes/   # can be overridden by extravars
+k8s_configs: "{{ k8s_path }}configs/"
+k8s_scripts: "{{ k8s_path }}scripts/"
+SupportedArch:
+  aarch64: arm64
+  x86_64: amd64
+arch: "{{ SupportedArch[ansible_facts['architecture']] | default('Unsupported') }}"
