@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logger
+spec:
+  selector:
+    matchLabels:
+      demo: sink
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        demo: sink
+    spec:
+      containers:
+      - name: logger
+        image: alpine/socat
+        ports:
+        - containerPort: 8080
+        command: ["socat"] # pipe messages to stdout (so it appears in logs)
+        args: ["-v", "-T", ".5", "tcp-l:8080,reuseaddr,fork", 'system:"{ DATEVAR=\$(date +\"%Y-%m-%d %H:%M:%S.%3N\"); echo \"HTTP/1.0 200 OK\nContent-Length: 0\n\n\"; }"']
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logger
+spec:
+  selector:
+    demo: sink
+  ports:
+  - port: 6666
+    targetPort: 8080
