@@ -1,0 +1,14 @@
+- name: Reset kubernetes
+  hosts: kubernetes
+  become: yes
+  vars_prompt:
+  - name: prompt
+    prompt: |
+      Type "NUKE" if you want to reset kubernetes (and delete all images and containers) on the following hosts:
+    
+      {{ ansible_play_batch }}
+    
+      Any other input will end the play.
+    private: false
+  roles: 
+  - role: k8s-reset

@@ -1,0 +1,34 @@
+# reset cluster and delete /etc/cni/net.d, prune through nerdctl, rmi and rm with ctrctl
+
+- name: Quitting
+  meta: end_play
+  run_once: true
+  when: prompt != "NUKE"
+
+- debug:
+    msg: "I will reset kubernetes if not cancelled within five seconds"
+- pause:
+    seconds: 5
+
+- name: Reset kubeadm
+  command: kubeadm reset --force
+
+- name: Reset iptables
+  command: iptables -F
+
+- name: Remove /etc/cni/net.d
+  file:
+    path: /etc/cni/net.d/
+    state: absent
+
+- name: Prune with nerdctl
+  command: nerdctl system prune --force
+
+- name: Remove remaining containers with crictl
+  command: crictl rm --all --force
+
+- name: Remove remaining images with crictl
+  command: crictl rmi --all --prune
+
+- name: Reboot
+  reboot:
