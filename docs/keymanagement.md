@@ -25,17 +25,19 @@ Good options for tls1.3: no tls compression, 0-rtt off, ocsp stapling on.
 
 Guidelines on TLS can be found in publications by NIST[^4] as well as recommendations on elliptic curve selection[^5] and alot more.
 
+Note: tried sha3-512 instead of sha-512, could not verify certificate signing requests with openssl due "unknown signature algorithm" error. Seems the consensus is there is no current use for a wider hash range, so alternative hashing algorithms like sha 3 have not been adopted yet amongst other reasons.[^9]
+
 [^3]: [NCSC-NL TLS Guidelines][TLSGuidelines]
 [^4]: [NIST TLS Guidelines][NISTTLSGuidelines]
 [^5]: [NIST Elliptic Curve Recommendations][NISTECRecommendations]
+[^9]: https://crypto.stackexchange.com/questions/72507/why-isn-t-sha-3-in-wider-use
 
-### Creating a root CA 
-For a examples see the OpenSSL docs[^6] and x509 cert conf format[^7], example with cert functionality we might need later to revoke?[^8].
+### Creating a root CA (domain.tld) 
+For examples see the OpenSSL docs[^6] and x509 cert conf format[^7], example with cert functionality we might need later to revoke?[^8]. After making a config, generate the private key and self-sign a certificate, which generates a public key and signature.
 ```
 openssl ecparam -list_curves         
 openssl genpkey -out root-private.pem -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
-openssl ec -in root-private.pem -pubout -out root-public.pem
-openssl req -config root.config -new -x509 -sha3-512 -key root-private.pem -out root-cert.pem -days 3650
+openssl req -config root.config -new -x509 -sha-512 -key root-private.pem -out root-cert.pem -days 3650
 openssl x509 -in root-cert.pem -text
 ```
 
@@ -43,10 +45,23 @@ openssl x509 -in root-cert.pem -text
 [^7]: [OpenSSL x509 conf format][opensslx509ex]
 [^8]: https://michaeljcallahan.medium.com/generating-an-elliptic-curve-certificate-authority-d5c47cca796e
 
+### Intermediate CA (cluster.domain.tld)
+Generate a certificate signing request (CSR) for the intermediate and sign it with the root CA. 
+```
+openssl genpkey -out intermediate-private.pem -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
+openssl req -config intermediate.config -new -key intermediate-private.pem -out intermediate.csr -sha-512
+openssl x509 -req -in intermediate.csr -CA root-cert.pem -CAkey root-private.pem -out intermediate-cert.pem -sha-512 -days 3650
+openssl x509 -in intermediate-cert.pem -text
+openssl verify -verbose -CAfile root-cert.pem intermediate-cert.pem
+```
+
+### Service Certificates (svc.cluster.domain.tld)
 
 
 ### Managing keys in a cluster.
 #### Kubernetes
+
+
 #### Cilium
 #### Nifi
 #### Kafka
