@@ -8,8 +8,32 @@
     token: "{{ token.stdout_lines[0] | trim }}"
   no_log: true
 
+- name: check alg used for public key
+  shell: "openssl x509 -in /etc/kubernetes/pki/ca.crt -text | grep 'Public Key Algorithm' | sed 's/^.*: //'"
+  delegate_to: "{{ controller }}"
+  register: algostr
+  no_log: true
+- set_fact:
+    algostr: "{{ algostr.stdout_lines[0] | trim }}"
+  no_log: true
+
+- set_fact:
+    algo: "ec"
+  when: algostr == "id-ecPublicKey"  
+  no_log: true
+- set_fact:
+    algo: "rsa"
+  when: algostr == "rsaEncryption"
+  no_log: true
+- debug:
+    msg: "Unimplemented algo type: {{algo}}"
+  when: algo is undefined
+- meta: end_play
+  when: algo is undefined
+  
+
 - name: Create hash
-  shell: openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //'
+  shell: openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl {{algo}} -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //'
   delegate_to: "{{ controller }}"
   register: hash
   no_log: true

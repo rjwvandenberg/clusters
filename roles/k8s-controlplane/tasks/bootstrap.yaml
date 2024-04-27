@@ -9,6 +9,15 @@
   - debug: msg="Cluster already initialized, since /etc/kubernetes/kubelet.conf exists. Consider using kubeadm reset if you want to create a new cluster."
     when: present.stat.exists
 
+  - name: Copy certs
+    copy: 
+      src: "{{certs}}"
+      dest: /etc/kubernetes/pki/
+      owner: root
+      group: root
+      mode: 0600
+    when: certs != "Unspecified"
+
   - name: Copy InitConfiguration
     template:
       src: init.j2
@@ -44,19 +53,30 @@
       mode: 0600
 
 - name: Remove NoSchedule
-  kubernetes.core.k8s_taint:
-    name: "{{ ansible_hostname }}"
-    state: absent
-    taints:
-    - effect: NoSchedule
-      key: node-role.kubernetes.io/control-plane
+  command: "kubectl taint nodes {{ ansible_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
   when: config.scheduling_on_control_plane == "allow"
+  ignore_errors: true
+
 - name: Add PreferNoSchedule
-  kubernetes.core.k8s_taint:
-    name: "{{ ansible_hostname }}"
-    state: present
-    taints:
-    - effect: PreferNoSchedule
-      key: node-role.kubernetes.io/control-plane 
+  command: "kubectl taint nodes {{ ansible_hostname }} node-role.kubernetes.io/control-plane:PreferNoSchedule"
   when: config.scheduling_on_control_plane == "allow"
+  ignore_errors: true
+
+# Does not work with system certs? and only accepts single cert as parameter?
+#- name: Remove NoSchedule
+#  kubernetes.core.k8s_taint:
+#    name: "{{ ansible_hostname }}"
+#    state: absent
+#    taints:
+#    - effect: NoSchedule
+#      key: node-role.kubernetes.io/control-plane
+#  when: config.scheduling_on_control_plane == "allow"
+#- name: Add PreferNoSchedule
+#  kubernetes.core.k8s_taint:
+#    name: "{{ ansible_hostname }}"
+#    state: present
+#    taints:
+#    - effect: PreferNoSchedule
+#      key: node-role.kubernetes.io/control-plane 
+#  when: config.scheduling_on_control_plane == "allow"
   

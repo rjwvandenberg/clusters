@@ -25,44 +25,70 @@ Good options for tls1.3: no tls compression, 0-rtt off, ocsp stapling on.
 
 Guidelines on TLS can be found in publications by NIST[^4] as well as recommendations on elliptic curve selection[^5] and alot more.
 
-Note: tried sha3-512 instead of sha-512, could not verify certificate signing requests with openssl due "unknown signature algorithm" error. Seems the consensus is there is no current use for a wider hash range, so alternative hashing algorithms like sha 3 have not been adopted yet amongst other reasons.[^9]
+Note: tried sha3-512 instead of sha-512, could not verify certificate signing requests with openssl due "unknown signature algorithm" error. Seems the consensus is there is no current use for a wider hash range, so alternative hashing algorithms like sha 3 have not been adopted yet amongst other reasons.[^8]
 
 [^3]: [NCSC-NL TLS Guidelines][TLSGuidelines]
 [^4]: [NIST TLS Guidelines][NISTTLSGuidelines]
 [^5]: [NIST Elliptic Curve Recommendations][NISTECRecommendations]
-[^9]: https://crypto.stackexchange.com/questions/72507/why-isn-t-sha-3-in-wider-use
+[^8]: https://crypto.stackexchange.com/questions/72507/why-isn-t-sha-3-in-wider-use
 
-### Creating a root CA (domain.tld) 
-For examples see the OpenSSL docs[^6] and x509 cert conf format[^7], example with cert functionality we might need later to revoke?[^8]. After making a config, generate the private key and self-sign a certificate, which generates a public key and signature.
+### Creating a root CA 
+For examples see the OpenSSL docs[^6] and x509 cert conf format[^7], example with cert functionality we might need later to revoke?[^9]. After making a config, generate the private key and self-sign a certificate, which generates a public key and signature.
 ```
 openssl ecparam -list_curves         
-openssl genpkey -out root-private.pem -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
-openssl req -config root.config -new -x509 -sha-512 -key root-private.pem -out root-cert.pem -days 3650
-openssl x509 -in root-cert.pem -text
+openssl genpkey -out root-private.key -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
+openssl req -config root.config -new -x509 -sha-512 -key root-private.key -out root.crt -days 3650
+openssl x509 -in root.crt -text
 ```
+
+
+
+#### the config
+distinguished_name: section header name  
+commonName: legacy field (single name for subject of cert)  
+basicConstraints:   
+keyUsage: https://www.gradenegger.eu/en/basics-the-key-usage-certificate-extension/  
+fields https://superuser.com/a/1248085  
 
 [^6]: [OpenSSL Docs: Examples][openssldocs]
 [^7]: [OpenSSL x509 conf format][opensslx509ex]
-[^8]: https://michaeljcallahan.medium.com/generating-an-elliptic-curve-certificate-authority-d5c47cca796e
+[^9]: https://michaeljcallahan.medium.com/generating-an-elliptic-curve-certificate-authority-d5c47cca796e
 
 ### Intermediate CA (cluster.domain.tld)
-Generate a certificate signing request (CSR) for the intermediate and sign it with the root CA. 
+Generate a certificate signing request (CSR) for the intermediate and sign it with the root CA. See [kubernetes](#kubernetes) for requirements to make it a cluster CA. If you make an intermediate CA that the cluster will manage, then don't encrypt the private key.   
+Note: csrs use req_extensions instead of x509_extensions in [ req ] header, otherwise openssl will not add keyUsage and basicConstraints to the csr. Also add -copy_extensions copy in the cert creation or they will be ignored.
 ```
-openssl genpkey -out intermediate-private.pem -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
-openssl req -config intermediate.config -new -key intermediate-private.pem -out intermediate.csr -sha-512
-openssl x509 -req -in intermediate.csr -CA root-cert.pem -CAkey root-private.pem -out intermediate-cert.pem -sha-512 -days 3650
-openssl x509 -in intermediate-cert.pem -text
-openssl verify -verbose -CAfile root-cert.pem intermediate-cert.pem
+openssl genpkey -out intermediate-private.key -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
+openssl req -config intermediate.config -new -key intermediate-private.key -out intermediate.csr -sha-512
+openssl x509 -req -copy_extensions copy -in intermediate.csr -CA root.crt -CAkey root-private.key -out intermediate.crt -sha-512 -days 3650
+openssl x509 -in intermediate.crt -text
+openssl verify -verbose -CAfile root.crt intermediate.crt
 ```
 
 ### Service Certificates (svc.cluster.domain.tld)
-
+Depends on how you deploy the CA etc. Let's first get that setup and functional before wrinting this section. Making CA's available across the cluster, Signing certs for the service, etc. In general for internal services, sign with internal dns, external services add the external dns / ip
 
 ### Managing keys in a cluster.
 #### Kubernetes
+Kubeadm by default creates all the CA's required to run the cluster[^10]. Let's instead sign the cluster CA's with an external root CA[^11][^12].
+
+1. Create ca.crt and ca.key like an intermediate CA, copy the root/intermediate certs used to the system certs directory, then kubeadm init.
+
+ Works up to this point, next the other two self-signed certs and then the other applications within the cluster.
+
+
+
+
+
+? Distribute the custom CA certs using a ConfigMap and give pods that need it read access to the configmap.
+
+[^10]: https://kubernetes.io/docs/setup/best-practices/certificates/
+[^11]: https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/
+[^12]: https://kubernetes.io/docs/tasks/administer-cluster/certificates/
 
 
 #### Cilium
+https://docs.cilium.io/en/stable/security/tls-visibility/
 #### Nifi
 #### Kafka
 #### Sidecars (for applications without or outdated mTLS?)

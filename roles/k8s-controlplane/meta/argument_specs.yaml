@@ -9,3 +9,6 @@ argument_specs:
       config:
         type: dict
         required: true
+      certs:
+        type: str
+        default: "Unspecified"

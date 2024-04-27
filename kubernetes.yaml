@@ -4,23 +4,29 @@
 # Required extra vars:
 # kubernetesconfigpath=filepath   # https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/
 # ciliumconfigpath=filepath       # https://docs.cilium.io/en/stable/helm-reference/
+# kubernetescertspath=directorypath where ca.crt and ca.key are
+# capath=directorypath where any root and intermediate certificates for ca.crt are
 - name: Load required variables
   hosts: kubernetes
   tasks:
   - set_fact:
       kubernetes_config: "{{ lookup('file', kubernetesconfigpath | mandatory) | from_yaml }}"
       cilium_config: "{{ lookup('file', ciliumconfigpath | mandatory) }}"
+      ca_path: "{{ capath if capath is defined else 'Unspecified' }}"
+      kubernetes_certs_path: "{{ kubernetescertspath if kubernetescertspath is defined else 'Unspecified' }}"
 
 - name: Bootstrap kubernetes cluster 
   hosts: kubernetes:&bootstrap
   roles: 
   - role: k8s-common
+    certificates: "{{ ca_path }}"
     reboot: false
   - role: k8s-tools
     build_tools: false
   - role: k8s-controlplane
     bootstrap: true
     config: "{{ kubernetes_config }}"
+    certs: "{{ kubernetes_certs_path }}"
   - role: cilium
     cilium_config_contents: "{{ cilium_config }}"
 
@@ -28,6 +34,7 @@
   hosts: kubernetes:&controlplane:!bootstrap
   roles:
   - role: k8s-common
+    certificates: "{{ ca_path }}"
     reboot: false
   - role: k8s-tools
     build_tools: false
@@ -45,6 +52,7 @@
   hosts: kubernetes:&worker
   roles:
   - role: k8s-common
+    certificates: "{{ ca_path }}"
     reboot: false
   - role: k8s-worker
     config: "{{ kubernetes_config }}"

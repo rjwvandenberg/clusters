@@ -15,7 +15,6 @@ apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
 controlPlaneEndpoint: {{ config.control_plane_endpoint }}:{{ config.apiserver_port }}
 networking:
-  # disabled for now
-  # serviceSubnet: 
-  # podSubnet:
-  # dnsDomain:
+  # serviceSubnet: config.cluster_ipv4_service_cidrs
+  # podSubnet: config.cluster_ipv4_pod_cidrs
+  dnsDomain: {{ config.dns_domain }}

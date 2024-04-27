@@ -3,6 +3,9 @@ argument_specs:
   main:
     short_description: Setup kubernetes prerequisites
     options:
+      certificates:
+        type: str
+        default: "Unspecified"
       reboot:
         type: bool
         default: true
