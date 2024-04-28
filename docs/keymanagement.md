@@ -84,18 +84,35 @@ With this setup you need to renew the CAs (ca, etcd/ca and front-proxy-ca) manua
 [^13]: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/#certificate-rotation
 
 #### Kubernetes pods
-Applications running in pods still need to be configured for mTLS, per application setup can be daunting, so let's first have a look at the Cilium Service Mesh, which enables mTLS at the service level, and Transparent Encryption for pod-to-pod encryption on cilium managed pods.
+Applications running in pods still need to be configured for mTLS, per application setup can be daunting, so let's first have a look at the Cilium Service Mesh, which enables mTLS at the service level, and Transparent Encryption for pod-to-pod encryption on cilium managed pods. Transparent Encryption does specifically does not provide any auth. The methods for wireguard and spire do not currently make use of the root ca we created for the control plane previously.
 
-#### Cilium service mesh
-Let's enable WireGuard tunnels for any traffic between nodes[^14]. Add encryption.{enabled, type, nodeEncryption} to the cilium config for (node/pod)<->(node/pod) encryption. Also open port 51871 on the cloud/node firewalls. The control plane encryption is explicitly not managed by cilium, but by kubernetes mTLS impl.  
+#### Cilium Transparent Encryption
+Let's enable WireGuard tunnels for encryption between pods and nodes[^14]. Add encryption.{enabled, type, nodeEncryption} to the cilium config. Also open port 51871 on the cloud/node firewalls. The control plane encryption is explicitly not managed by cilium, but by kubernetes mTLS impl.  
 Note: This could result in traffic to pods on Control Plane nodes that are not part of the control plane if PreferNoSchedule taint is set on control-plane node-role (see last section of link above, node-to-node encryption). Therefore removed setting "scheduling_on_control_plane: allow" from kubernetesconfig in the local testconfig.
 
 [^14]: https://docs.cilium.io/en/latest/security/network/encryption-wireguard/
 
+Test the Transparent Encryption on various control/worker nodes with:
+```
+kubectl -n kube-system exec -ti <cilium-pod> -- cilium-dbg status | grep Encryption
+```
+Control plane nodes will display NodeEncryption: OptedOut.
 
-https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication/
-https://docs.cilium.io/en/stable/security/tls-visibility/
-https://docs.cilium.io/en/latest/security/threat-model/
+Now that encryption is enabled we can enable service mesh mutual authentication.[^16][^17] 
+
+
+
+Information on improvements in ciliums mutual auth security [^15]. Enable authentication.mutual.spire settings in cilium config. 
+
+
+TODO: extern/ingress mTLS  
+TODO: tie internal auth to the external root ca  
+TODO: https://docs.cilium.io/en/stable/security/tls-visibility/  
+TODO: https://docs.cilium.io/en/latest/security/threat-model/  
+
+[^15]: https://cilium.io/blog/2024/03/20/improving-mutual-auth-security/
+[^16]: https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication/
+[^17]: https://www.youtube.com/watch?v=tE9U1gNWzqs
 
 
 
