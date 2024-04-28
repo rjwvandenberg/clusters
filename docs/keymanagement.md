@@ -83,9 +83,27 @@ With this setup you need to renew the CAs (ca, etcd/ca and front-proxy-ca) manua
 [^12]: https://kubernetes.io/docs/tasks/administer-cluster/certificates/
 [^13]: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/#certificate-rotation
 
+#### Kubernetes pods
+Applications running in pods still need to be configured for mTLS, per application setup can be daunting, so let's first have a look at the Cilium Service Mesh, which enables mTLS at the service level, and Transparent Encryption for pod-to-pod encryption on cilium managed pods.
 
-#### Cilium
+#### Cilium service mesh
+Let's enable WireGuard tunnels for any traffic between nodes[^14]. Add encryption.{enabled, type, nodeEncryption} to the cilium config for (node/pod)<->(node/pod) encryption. Also open port 51871 on the cloud/node firewalls. The control plane encryption is explicitly not managed by cilium, but by kubernetes mTLS impl.  
+Note: This could result in traffic to pods on Control Plane nodes that are not part of the control plane if PreferNoSchedule taint is set on control-plane node-role (see last section of link above, node-to-node encryption). Therefore removed setting "scheduling_on_control_plane: allow" from kubernetesconfig in the local testconfig.
+
+[^14]: https://docs.cilium.io/en/latest/security/network/encryption-wireguard/
+
+
+https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication/
 https://docs.cilium.io/en/stable/security/tls-visibility/
+https://docs.cilium.io/en/latest/security/threat-model/
+
+
+
+
+#### HAProxy
+
+
+### app specific:
 #### Nifi
 #### Kafka
 #### Sidecars (for applications without or outdated mTLS?)
