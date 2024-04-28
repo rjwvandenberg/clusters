@@ -1,3 +1,11 @@
+- name: Load required variables
+  hosts: kubernetes
+  tasks:
+  - set_fact:
+      purge_var: "{{ (purge | mandatory) in ['YES','yes','TRUE','true'] }}"
+  - debug:
+      msg: "Purge is {{ 'enabled' if purge_var else 'disabled' }}"
+
 - name: Reset kubernetes
   hosts: kubernetes
   become: yes
@@ -12,3 +20,4 @@
     private: false
   roles: 
   - role: k8s-reset
+    purge: "{{purge_var | bool}}"

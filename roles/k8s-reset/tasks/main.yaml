@@ -23,12 +23,15 @@
 
 - name: Prune with nerdctl
   command: nerdctl system prune --force
+  when: "purge | bool"
 
 - name: Remove remaining containers with crictl
   command: crictl rm --all --force
+  when: "purge | bool"
 
 - name: Remove remaining images with crictl
   command: crictl rmi --all --prune
+  when: "purge | bool"
 
 - name: Reboot
   reboot:

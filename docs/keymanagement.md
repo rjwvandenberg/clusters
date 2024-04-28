@@ -69,22 +69,19 @@ openssl verify -verbose -CAfile root.crt intermediate.crt
 Depends on how you deploy the CA etc. Let's first get that setup and functional before wrinting this section. Making CA's available across the cluster, Signing certs for the service, etc. In general for internal services, sign with internal dns, external services add the external dns / ip
 
 ### Managing keys in a cluster.
-#### Kubernetes
-Kubeadm by default creates all the CA's required to run the cluster[^10]. Let's instead sign the cluster CA's with an external root CA[^11][^12].
+#### Kubernetes control plane
+Kubeadm by default creates all the CA's required to run the cluster[^10]. Let's instead sign the cluster CA's with an external root CA[^12].
 
-1. Create ca.crt and ca.key like an intermediate CA, copy the root/intermediate certs used to the system certs directory, then kubeadm init.
+1. Create ca.crt and ca.key like an intermediate CA, copy the root/intermediate certs chain used to the appropriate certs directory on all the nodes, then kubeadm init (see roles k8s-control-plane and k8s-common). etcd/ca.{key,crt} and front-proxy-ca.{key,crt} are the other two CA's kubernetes needs.
+  
+2. Could go one step further and not copy the .key files. You would have to sign everthing externally. (not doing that for now) kubadm config ClusterConfiguration version v1beta4 will bring alternate ciphers. Currently kubeadm only generates rsa2048 from the CAs provided.
 
- Works up to this point, next the other two self-signed certs and then the other applications within the cluster.
-
-
-
-
-
-? Distribute the custom CA certs using a ConfigMap and give pods that need it read access to the configmap.
+With this setup you need to renew the CAs (ca, etcd/ca and front-proxy-ca) manually, kubelet renew their client certs automatically[^13], everything else control plane related should renew during kubeadm control-plane upgrades[^11].
 
 [^10]: https://kubernetes.io/docs/setup/best-practices/certificates/
 [^11]: https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/
 [^12]: https://kubernetes.io/docs/tasks/administer-cluster/certificates/
+[^13]: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/#certificate-rotation
 
 
 #### Cilium
