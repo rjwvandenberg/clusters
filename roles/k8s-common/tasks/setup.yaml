@@ -17,17 +17,18 @@
         - gpg
         - python3-kubernetes    # for ansible plugins
 
-  - name: copy private certificates (need to be .crt, 1 cert per file)
+  - name: copy private root certificate
     copy:
-      src: "{{certificates}}"
-      dest: /usr/local/share/ca-certificates 
+      src: "{{root_certificate}}"
+      dest: /usr/local/share/ca-certificates/
       owner: root
       group: root
       mode: 0644
-    when: certificates != "Unspecified"
+    when: root_certificate != "Unspecified"
 
-  - name: enable private certificates
-    command: update-ca-certificates
+  - name: enable private certificate
+    command: update-ca-certificates -f
+    when: root_certificate
 
   # Container runtime adjustments https://kubernetes.io/docs/setup/production-environment/container-runtimes/
   # Dual stack networking https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/dual-stack-support/

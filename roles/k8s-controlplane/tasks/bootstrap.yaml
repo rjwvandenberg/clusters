@@ -52,16 +52,7 @@
       group: "{{ ansible_user_id }}"
       mode: 0600
 
-- name: Remove NoSchedule
-  command: "kubectl taint nodes {{ ansible_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-"
-  when: config.scheduling_on_control_plane == "allow"
-  ignore_errors: true
-
-- name: Add PreferNoSchedule
-  command: "kubectl taint nodes {{ ansible_hostname }} node-role.kubernetes.io/control-plane:PreferNoSchedule"
-  when: config.scheduling_on_control_plane == "allow"
-  ignore_errors: true
-
+# Don't enable this if you want to do transparent encryption (control-plane node? excluded from transparent encryption /docs/keymanagement.md)
 # Does not work with system certs? and only accepts single cert as parameter?
 #- name: Remove NoSchedule
 #  kubernetes.core.k8s_taint:

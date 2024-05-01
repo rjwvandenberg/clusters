@@ -33,5 +33,11 @@
   command: crictl rmi --all --prune
   when: "purge | bool"
 
+- name: Remove root certificates
+  command: rm -f /usr/local/share/ca-certificates/*.crt
+
+- name: Remove root ca symlinks
+  command: update-ca-certificates -f
+
 - name: Reboot
   reboot:
