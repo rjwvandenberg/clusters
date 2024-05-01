@@ -1,5 +1,8 @@
 A short summary of key management. I limited the scope to the technical side of a single application or set of applications that need to communicate securely. Specifically avoiding key policy, procedures and such.
 
+next on readlist: 
+TODO: https://smallstep.com/blog/kubernetes-the-secure-way/ 
+
 ### Overview
 
 Network encryption of https traffic is done with TLS[^1]. The server managing the security of the connection needs access to private and public TLS keys and a certificate issued by an Authority (CA). The certificate is a document by the Authority that guarantees the servers name and public key are authentic. The client starting the connection with the server can validate the certificate after which it uses the servers public key to setup the connection. Lastly the servers private key is used in decrypting communication from clients during the handshake. After the handhsake the connection is private, authenticated and tamper proof.
@@ -25,7 +28,9 @@ Good options for tls1.3: no tls compression, 0-rtt off, ocsp stapling on.
 
 Guidelines on TLS can be found in publications by NIST[^4] as well as recommendations on elliptic curve selection[^5] and alot more.
 
-Note: tried sha3-512 instead of sha-512, could not verify certificate signing requests with openssl due "unknown signature algorithm" error. Seems the consensus is there is no current use for a wider hash range, so alternative hashing algorithms like sha 3 have not been adopted yet amongst other reasons.[^8]
+Note: tried sha3-512 instead of sha-512, could not verify certificate signing requests with openssl due "unknown signature algorithm" error. Seems the consensus is there is no current use for a wider hash range, so alternative hashing algorithms like sha 3 have not been adopted yet amongst other reasons.[^8]  
+Note: kubernetes control-plane is limited by golang supported ciphers.  
+Note: using kubeadm to set up kubernetes forces rsa for auto-generated keys. Need to setup external CA and control the entire cert chain to use other algorithms.  
 
 [^3]: [NCSC-NL TLS Guidelines][TLSGuidelines]
 [^4]: [NIST TLS Guidelines][NISTTLSGuidelines]
@@ -41,21 +46,13 @@ openssl req -config root.config -new -x509 -sha-512 -key root-private.key -out r
 openssl x509 -in root.crt -text
 ```
 
-
-
-#### the config
-distinguished_name: section header name  
-commonName: legacy field (single name for subject of cert)  
-basicConstraints:   
-keyUsage: https://www.gradenegger.eu/en/basics-the-key-usage-certificate-extension/  
-fields https://superuser.com/a/1248085  
-
 [^6]: [OpenSSL Docs: Examples][openssldocs]
 [^7]: [OpenSSL x509 conf format][opensslx509ex]
 [^9]: https://michaeljcallahan.medium.com/generating-an-elliptic-curve-certificate-authority-d5c47cca796e
 
 ### Intermediate CA (cluster.domain.tld)
-Generate a certificate signing request (CSR) for the intermediate and sign it with the root CA. See [kubernetes](#kubernetes) for requirements to make it a cluster CA. If you make an intermediate CA that the cluster will manage, then don't encrypt the private key.   
+Generate a certificate signing request (CSR) for the intermediate and sign it with the root CA. See [kubernetes](#kubernetes) for requirements to make it a cluster CA. If you make an intermediate CA that the cluster will manage, then don't encrypt the private key.
+
 Note: csrs use req_extensions instead of x509_extensions in [ req ] header, otherwise openssl will not add keyUsage and basicConstraints to the csr. Also add -copy_extensions copy in the cert creation or they will be ignored.
 ```
 openssl genpkey -out intermediate-private.key -algorithm EC -pkeyopt ec_paramgen_curve:secp384r1 -aes256
@@ -65,14 +62,31 @@ openssl x509 -in intermediate.crt -text
 openssl verify -verbose -CAfile root.crt intermediate.crt
 ```
 
+#### Potential issues related to intermediate CAs
+The pki truststore contains the CA certificates for authenticating a request. 
+When making the choice on how and where to distribute the cert chain,
+trust-manager (a certificate bundler) says the following about adding intermediates to truststores: "the intermediate cannot be safely rotated without all trust stores which contain it being updated first"[^bundlingintermediatesissue]
+
+When managing a single truststore adding an intermediate can be ok, but when independent projects with independent truststores start forming...
+
+In short for cross service mainability:
+- only distribute the root CA to trust stores
+- configure endpoints with the full chain from endpoint up to this root CA (the endpoint cert and any intermediate to the root)
+
+
+[^bundlingintermediatesissue]: https://cert-manager.io/docs/trust/trust-manager/#bundling-intermediates
+[^chainlimitations]: https://github.com/kubernetes/kubeadm/issues/2360#issuecomment-986901379
+
 ### Service Certificates (svc.cluster.domain.tld)
 Depends on how you deploy the CA etc. Let's first get that setup and functional before wrinting this section. Making CA's available across the cluster, Signing certs for the service, etc. In general for internal services, sign with internal dns, external services add the external dns / ip
 
 ### Managing keys in a cluster.
 #### Kubernetes control plane
-Kubeadm by default creates all the CA's required to run the cluster[^10]. Let's instead sign the cluster CA's with an external root CA[^12].
 
-1. Create ca.crt and ca.key like an intermediate CA, copy the root/intermediate certs chain used to the appropriate certs directory on all the nodes, then kubeadm init (see roles k8s-control-plane and k8s-common). etcd/ca.{key,crt} and front-proxy-ca.{key,crt} are the other two CA's kubernetes needs.
+// TODO; rewrite reflecting the changes made for twotier and then the cilium spire ca
+Kubeadm by default creates all the CA's required to run the cluster[^10]. Let's instead sign the cluster CA's with an external root CA[^12]. Secondly set the minimum TLS to 1.3 for the initConfiguration, joinConfiguration and clusterConfiguration.
+
+1. Create ca.crt and ca.key like an intermediate CA, copy the root certs to the appropriate certs directory on all the nodes, then kubeadm init (see roles k8s-control-plane and k8s-common). etcd/ca.{key,crt} and front-proxy-ca.{key,crt} are the other two CA's kubernetes needs. The ca.crt need to be a full chain up to the root CA (leaf, intermediate crts...)
   
 2. Could go one step further and not copy the .key files. You would have to sign everthing externally. (not doing that for now) kubadm config ClusterConfiguration version v1beta4 will bring alternate ciphers. Currently kubeadm only generates rsa2048 from the CAs provided.
 
@@ -86,7 +100,12 @@ With this setup you need to renew the CAs (ca, etcd/ca and front-proxy-ca) manua
 #### Kubernetes pods
 Applications running in pods still need to be configured for mTLS, per application setup can be daunting, so let's first have a look at the Cilium Service Mesh, which enables mTLS at the service level, and Transparent Encryption for pod-to-pod encryption on cilium managed pods. Transparent Encryption does specifically does not provide any auth. The methods for wireguard and spire do not currently make use of the root ca we created for the control plane previously.
 
+
 #### Cilium Transparent Encryption
+https://isovalent.com/blog/post/zero-trust-security-with-cilium/
+
+// TODO rewrite with the changes made spire
+
 Let's enable WireGuard tunnels for encryption between pods and nodes[^14]. Add encryption.{enabled, type, nodeEncryption} to the cilium config. Also open port 51871 on the cloud/node firewalls. The control plane encryption is explicitly not managed by cilium, but by kubernetes mTLS impl.  
 Note: This could result in traffic to pods on Control Plane nodes that are not part of the control plane if PreferNoSchedule taint is set on control-plane node-role (see last section of link above, node-to-node encryption). Therefore removed setting "scheduling_on_control_plane: allow" from kubernetesconfig in the local testconfig.
 
@@ -102,13 +121,65 @@ Now that encryption is enabled we can enable service mesh mutual authentication.
 
 
 
+1. create cilium namespace with intermediate CA for spire as secrets tls and a configmap with disk
+     (insert spire link)
+   sign the intermediate CA with the kubernetes-ca since that one is auto distributed with secrets?
+
+spire docs for config 
+https://spiffe.io/docs/latest/deploying/spire_server/
+https://github.com/spiffe/spire/blob/v1.9.3/doc/plugin_server_upstreamauthority_disk.md
+```
+UpstreamAuthority "disk" {
+    plugin_data {
+        cert_file_path = "cert-chain: concat the {spire-cert, intermediate-certs-to-root...}.crt files"
+        key_file_path = "spire-key"
+        bundle_file_path = "root-cert"
+    }
+}
+```
+need to mount the files somehow
+
+2. create the api
+
+
+----
+Ok, at this point, managing certificates becomes cumbersome. Problems:
+1. Generating certs
+2. Assigning certs to workloads
+3. Loading certs into workloads
+4. Updating certs
+
+There are kubernetes cncf solutions for this:
+1. trust-manager - distributes bundles of certs https://cert-manager.io/docs/trust/trust-manager/
+2. cert-manager - generates key,certs for workloads
+
+By using these abstractions, you will get a more unified way of generating trust and distributing it. It still requires point 3, but limits its scope to integration with the workload.
+
+---
+
+
+
+
+Spire-server holds a secrets reference to the kuberenetes-ca crt.
+
+Mounts:
+      /run/spire/bundle from spire-bundle (rw)      spire CA issuer 73:7e:51:64:57:ff:2a:f6:3f:19:1c:f1:53:4e:ec:0f subj
+      /run/spire/config from spire-config (ro)   config
+      /run/spire/sockets from spire-agent-socket (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-sd8gg (ro)
+      /var/run/secrets/tokens from spire-agent (rw)
+
+
 Information on improvements in ciliums mutual auth security [^15]. Enable authentication.mutual.spire settings in cilium config. 
 
-
+TODO: review networkpolicies
 TODO: extern/ingress mTLS  
-TODO: tie internal auth to the external root ca  
+TODO: tie internal auth to the external root ca (not possible through cilium? so external spire, or custom spire image authentication.mutual.spire.install.agent.image) 
 TODO: https://docs.cilium.io/en/stable/security/tls-visibility/  
-TODO: https://docs.cilium.io/en/latest/security/threat-model/  
+TODO: https://docs.cilium.io/en/latest/security/threat-model/    
+TODO: read link https://www.cloudexpoeurope.de/news/securing-microservices-communication-mtls-kubernetes
+TODO: https://github.com/smallstep/autocert  
+TODO: cert-manager / trust-manager   
 
 [^15]: https://cilium.io/blog/2024/03/20/improving-mutual-auth-security/
 [^16]: https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication/

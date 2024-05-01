@@ -5,11 +5,14 @@ apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 nodeRegistration:
   criSocket: "unix:///run/containerd/containerd.sock" 
-  kubeletExtraArgs: 
+  kubeletExtraArgs:   # https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
     node-labels: node.{{ config.label_domain }}/lifetime=persistent
+    # anonymous-auth: "false" # TODO: generate account requires setting up an account before-hand?
+    tls-min-version: VersionTLS13
 
 skipPhases: 
   - addon/kube-proxy    # skip in favor of cilium
+
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
@@ -18,3 +21,25 @@ networking:
   # serviceSubnet: config.cluster_ipv4_service_cidrs
   # podSubnet: config.cluster_ipv4_pod_cidrs
   dnsDomain: {{ config.dns_domain }}
+# Setup extraArgs for mTLS and ciphers
+etcd:
+  local:
+    extraArgs:
+      tls-min-version: TLS1.3
+apiServer:
+  extraArgs:
+    tls-min-version: VersionTLS13
+controllerManager:
+  extraArgs:
+    tls-min-version: VersionTLS13
+scheduler:
+  extraArgs:
+    tls-min-version: VersionTLS13
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+
+
+
+
+# i dont use kubeproxy so no config needed
