@@ -1,7 +1,11 @@
 A short summary of key management. I limited the scope to the technical side of a single application or set of applications that need to communicate securely. Specifically avoiding key policy, procedures and such.
 
-next on readlist: 
-TODO: https://smallstep.com/blog/kubernetes-the-secure-way/ 
+TODO: When done, set expiration for all certs to 1 hour and see what breaks first :)  
+TODO: diagram the setup
+TODO:
+- spire linked to root ca
+- external tls using cert+trust manager? need that intermediate-endpoint bundle
+- haproxy for external access trust check
 
 ### Overview
 
@@ -22,20 +26,21 @@ As an aside, for the web there have been efforts to replace the third-party CAs 
 Within the cluster we should be able to control all settings for secure communication[^3]. Therefore lets try and use: 
 - Algorithm for key exchange: ECDHE(secp384r1) + SHA-512
 - Algorithm for cert verification: ECDSA (secp384r1) + SHA-512
-- Algorithm for bulk encryption: AES-256-GCM + HMAC-SHA-512
+- (cipher) Algorithm for bulk encryption: AES-256-GCM + HMAC-SHA-512
 
 Good options for tls1.3: no tls compression, 0-rtt off, ocsp stapling on.
 
 Guidelines on TLS can be found in publications by NIST[^4] as well as recommendations on elliptic curve selection[^5] and alot more.
 
 Note: tried sha3-512 instead of sha-512, could not verify certificate signing requests with openssl due "unknown signature algorithm" error. Seems the consensus is there is no current use for a wider hash range, so alternative hashing algorithms like sha 3 have not been adopted yet amongst other reasons.[^8]  
-Note: kubernetes control-plane is limited by golang supported ciphers.  
+Note: kubernetes control-plane is limited by golang supported ciphers. Selecting tlsMinVersion 1.3 will disallow selecting a specific cipher as they all are deemed safe by golang.[^golangcipherdiscussion]   
 Note: using kubeadm to set up kubernetes forces rsa for auto-generated keys. Need to setup external CA and control the entire cert chain to use other algorithms.  
 
 [^3]: [NCSC-NL TLS Guidelines][TLSGuidelines]
 [^4]: [NIST TLS Guidelines][NISTTLSGuidelines]
 [^5]: [NIST Elliptic Curve Recommendations][NISTECRecommendations]
 [^8]: https://crypto.stackexchange.com/questions/72507/why-isn-t-sha-3-in-wider-use
+[^golangcipherdiscussion]: https://github.com/golang/go/issues/29349
 
 ### Creating a root CA 
 For examples see the OpenSSL docs[^6] and x509 cert conf format[^7], example with cert functionality we might need later to revoke?[^9]. After making a config, generate the private key and self-sign a certificate, which generates a public key and signature.
@@ -81,9 +86,50 @@ In short for cross service mainability:
 Depends on how you deploy the CA etc. Let's first get that setup and functional before wrinting this section. Making CA's available across the cluster, Signing certs for the service, etc. In general for internal services, sign with internal dns, external services add the external dns / ip
 
 ### Managing keys in a cluster.
+By default kubernetes uses tokens for authentication and RBAC as the authorization check on the control plane.[^clusteraccess][^securingacluster]  
+Note: not sure how tokens are checked. Both admin.conf and the tls for apiserver only contain kubernetes-ca, no intermediate ca. And connection was established despite intermediate ca between root and kubernete-ca not being in truststore or passed to kubernetes. May be sufficient for control plane to know its a valid token and signature originating from its own cert? // TODO: look into this
+
+Spire uses SPIFF ID(spiff://trust_domain/id) encoded in a x509 certificate to prove the identity of a service.[^tetrateoverview]  Cilium Mutual Authentication automates the creation of SVID identities for in-cluster service level mTLS connections.[^mutualauthcil] 
+
+Cert-manager supplies and renews certs to pods for application level mTLS. It has a spire csi driver to enable dynamic SVID generation for the lifetime of any pod.[^certmanagersvid] Cert-manager can also distribute and mount the root certificate into pods.
+
+Trust-manager can be used to supply bundles of certificates in the cluster using a Bundle resource. It seems to preserve order and therefore could serve as a way to distribute cert chains too? 
+
+Remains the problem of constructing the leaf + intermediates (+ optional root). Might have to use an init command/container to construct it on pod creation? Or maybe theres an option somewhere in spire, cert-manager, or cilium.
+
+Maybe https://github.com/spiffe/spire/pull/391/commits/bb6cd7610ccc39bb6aabeebacd09b71ba79cc6ee upstreambundle for spire config? If this works as I read it then it would solve the entire chain problem, removing the need for trust-manager?
+
+[^clusteraccess]: https://kubernetes.io/docs/concepts/security/controlling-access/
+[^securingacluster]: https://kubernetes.io/docs/tasks/administer-cluster/securing-a-cluster/
+[^tetrateoverview]: https://tetrate.io/blog/managing-certificates-in-istio-with-cert-manager-and-spire/
+[^mutualauthcil]: https://docs.cilium.io/en/latest/network/servicemesh/mutual-authentication/mutual-authentication/
+[^certmanagersvid]: https://cert-manager.io/docs/usage/csi-driver-spiffe/
+
+
+
+
+
+
+
+
+
+
+
+
+
 #### Kubernetes control plane
+Min tls version, false auth
 
 // TODO; rewrite reflecting the changes made for twotier and then the cilium spire ca
+The command return apiserver cert, not including kubernetes-ca cert? 
+kinda makes sense kubernetes only there for the control plane, so as long as someone does not have access to the control plane nodes or keys are external, k8s can just check against its own root/intermediate CA
+
+// TODO: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
+check against those settings
+
+```
+echo | openssl s_client -showcerts -servername localhost -connect localhost:6443
+```
 Kubeadm by default creates all the CA's required to run the cluster[^10]. Let's instead sign the cluster CA's with an external root CA[^12]. Secondly set the minimum TLS to 1.3 for the initConfiguration, joinConfiguration and clusterConfiguration.
 
 1. Create ca.crt and ca.key like an intermediate CA, copy the root certs to the appropriate certs directory on all the nodes, then kubeadm init (see roles k8s-control-plane and k8s-common). etcd/ca.{key,crt} and front-proxy-ca.{key,crt} are the other two CA's kubernetes needs. The ca.crt need to be a full chain up to the root CA (leaf, intermediate crts...)
@@ -96,7 +142,6 @@ With this setup you need to renew the CAs (ca, etcd/ca and front-proxy-ca) manua
 [^11]: https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/
 [^12]: https://kubernetes.io/docs/tasks/administer-cluster/certificates/
 [^13]: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/#certificate-rotation
-
 #### Kubernetes pods
 Applications running in pods still need to be configured for mTLS, per application setup can be daunting, so let's first have a look at the Cilium Service Mesh, which enables mTLS at the service level, and Transparent Encryption for pod-to-pod encryption on cilium managed pods. Transparent Encryption does specifically does not provide any auth. The methods for wireguard and spire do not currently make use of the root ca we created for the control plane previously.
 
@@ -178,7 +223,6 @@ TODO: tie internal auth to the external root ca (not possible through cilium? so
 TODO: https://docs.cilium.io/en/stable/security/tls-visibility/  
 TODO: https://docs.cilium.io/en/latest/security/threat-model/    
 TODO: read link https://www.cloudexpoeurope.de/news/securing-microservices-communication-mtls-kubernetes
-TODO: https://github.com/smallstep/autocert  
 TODO: cert-manager / trust-manager   
 
 [^15]: https://cilium.io/blog/2024/03/20/improving-mutual-auth-security/
@@ -190,12 +234,17 @@ TODO: cert-manager / trust-manager
 
 #### HAProxy
 
-
+### observability
+### accesslogging
+### renewal
 ### app specific:
 #### Nifi
 #### Kafka
 #### Sidecars (for applications without or outdated mTLS?)
 
+### External CA
+TODO: https://github.com/smallstep/certificates external ca?  
+TODO: https://github.com/smallstep/autocert  
 
 ### Links
 - Publications on cyber security by NCSC-NL: https://english.ncsc.nl/publications

@@ -7,8 +7,13 @@ discovery:
     caCertHashes:
       - sha256:{{ hash }}
 nodeRegistration:
-  criSocket: "unix:///run/containerd/containerd.sock" 
   kubeletExtraArgs: 
     node-labels: node.{{ config.label_domain }}/lifetime=ephemeral
-    # anonymous-auth: "false"  # generate account  requires setting up an account before-hand?
-    tls-min-version: VersionTLS13
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration                # https://pkg.go.dev/k8s.io/kubelet/config/v1beta1#KubeletConfiguration
+tlsMinVersion: VersionTLS13
+containerRuntimeEndpoint: 'unix:///run/containerd/containerd.sock'
+authentication:
+  anonymous:
+    enabled: false
